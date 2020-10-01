@@ -1,9 +1,11 @@
 package io.d4mn.capacitor.video.download;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
@@ -186,13 +188,20 @@ public class MediaPlugin extends Plugin {
 
         String album = call.getString("album");
         final String extension = call.getString("extension");
-        File albumDir = Environment.getExternalStoragePublicDirectory(dest);
+        File mainDir;
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+            mainDir = Environment.getExternalStoragePublicDirectory(dest);
+        } else {
+            mainDir = this.getContext().getExternalFilesDir(dest);
+        }
+        File albumDir = mainDir;
         if (album != null) {
-            albumDir = new File(albumDir, album);
+            albumDir = new File(mainDir, album);
             // if destination folder does not exist, create it
             if (!albumDir.exists()) {
                 if (!albumDir.mkdir()) {
-                    throw new RuntimeException("Destination folder does not exist and cannot be created.");
+                    //throw new RuntimeException("Destination folder does not exist and cannot be created.");
+                    albumDir = mainDir;
                 }
             }
         }
@@ -306,10 +315,18 @@ public class MediaPlugin extends Plugin {
     }
 
     private void scanPhoto(File imageFile) {
+        MediaScannerConnection.scanFile(this.getContext(),
+                new String[] { imageFile.getPath() }, new String[] { "video/mp4" },
+                new MediaScannerConnection.OnScanCompletedListener() {
+                    public void onScanCompleted(String path, Uri uri) {
+                        Log.i("ExternalStorage", "Scanned file" + path + ":");
+                        Log.i("ExternalStorage", "-> uri=" + uri);
+                    }
+                });
         Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
         Uri contentUri = Uri.fromFile(imageFile);
         mediaScanIntent.setData(contentUri);
-        bridge.getActivity().sendBroadcast(mediaScanIntent);
+        this.getContext().sendBroadcast(mediaScanIntent);
     }
 
 
