@@ -1,6 +1,8 @@
 package io.d4mn.capacitor.video.download;
 
 import android.Manifest;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -8,6 +10,7 @@ import android.database.Cursor;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Environment;
 import android.util.Log;
 import android.provider.MediaStore;
@@ -28,12 +31,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.channels.FileChannel;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Objects;
 
 
 @NativePlugin(permissions = {
@@ -179,89 +184,42 @@ public class MediaPlugin extends Plugin {
     }
 
     private void _saveMedia(final PluginCall call, String destination) {
-        String dest;
-        if (destination == "MOVIES") {
-            dest = Environment.DIRECTORY_MOVIES;
-        } else {
-            dest = Environment.DIRECTORY_PICTURES;
-        }
-
         String album = call.getString("album");
         final String extension = call.getString("extension");
-        File mainDir;
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
-            mainDir = Environment.getExternalStoragePublicDirectory(dest);
-        } else {
-            mainDir = this.getContext().getExternalFilesDir(dest);
-        }
-        File albumDir = mainDir;
-        if (album != null) {
-            albumDir = new File(mainDir, album);
-            // if destination folder does not exist, create it
-            if (!albumDir.exists()) {
-                if (!albumDir.mkdir()) {
-                    //throw new RuntimeException("Destination folder does not exist and cannot be created.");
-                    albumDir = mainDir;
-                }
-            }
-        }
 
-        Log.d(MediaPlugin.tag, "___SAVE MEDIA TO ALBUM " + albumDir.getPath());
+        Log.d(MediaPlugin.tag, "___SAVE MEDIA TO ALBUM " + album);
 
         final String inputPath = call.getString("path");
-        if (inputPath == null) {
+        if (inputPath == null || (!inputPath.startsWith("http") && !inputPath.startsWith("https"))) {
             call.reject("Input file path is required");
             return;
         }
 
         final JSObject result = new JSObject();
-
-        if (inputPath.startsWith("http") || inputPath.startsWith("https")) {
-            try {
-                final File finalAlbumDir = albumDir;
-                downloadTask = new DownloadMedia() {
-                    @Override
-                    public void onPostExecute(AsyncTaskResult<File> expFile) {
-                        if (expFile.getError() != null) {
-                            call.reject(expFile.getError().getMessage());
-                        } else if (isCancelled()) {
-                            // cancel handling here
-                        } else {
-                            File downloadedFile = expFile.getResult();
-                            scanPhoto(downloadedFile);
-                            result.put("filePath", expFile.toString());
-                            call.resolve(result);
-                        }
+        try {
+            downloadTask = new DownloadMedia(this.getContext()) {
+                @Override
+                public void onPostExecute(AsyncTaskResult<File> expFile) {
+                    if (expFile.getError() != null) {
+                        call.reject(expFile.getError().getMessage());
+                    } else if (isCancelled()) {
+                        // cancel handling here
+                    } else {
+                        File downloadedFile = expFile.getResult();
+                        scanPhoto(downloadedFile);
+                        result.put("filePath", expFile.toString());
+                        call.resolve(result);
                     }
+                }
 
-                    @Override
-                    protected void onCancelled(AsyncTaskResult<File> fileAsyncTaskResult) {
-                        super.onCancelled(fileAsyncTaskResult);
-                        Log.d(MediaPlugin.tag,"Canceled download task "+fileAsyncTaskResult.getResult());
-                        fileAsyncTaskResult.getResult().delete();
-                    }
-                }.execute(inputPath, albumDir.getPath(), extension);
-            } catch (RuntimeException e) {
-                call.reject("RuntimeException occurred", e);
-            }
-
-        } else {
-            String fileLocalPath;
-            fileLocalPath = Uri.parse(inputPath).getPath();
-            if (fileLocalPath == "") {
-                call.reject("File save failed");
-                return;
-            }
-            File inputFile = new File(fileLocalPath);
-            try {
-                final File expFile;
-                expFile = copyFile(inputFile, albumDir, extension);
-                scanPhoto(expFile);
-                result.put("filePath", expFile.toString());
-                call.resolve(result);
-            } catch (RuntimeException e) {
-                call.reject("RuntimeException occurred", e);
-            }
+                @Override
+                protected void onCancelled(AsyncTaskResult<File> fileAsyncTaskResult) {
+                    super.onCancelled(fileAsyncTaskResult);
+                    Log.d(MediaPlugin.tag, "Canceled download task " + fileAsyncTaskResult.getResult());
+                }
+            }.execute(inputPath, album, extension);
+        } catch (RuntimeException e) {
+            call.reject("RuntimeException occurred", e);
         }
 
     }
@@ -315,8 +273,9 @@ public class MediaPlugin extends Plugin {
     }
 
     private void scanPhoto(File imageFile) {
+        Log.i("MyMediaScan", "Scanned folder: " + imageFile.getParent());
         MediaScannerConnection.scanFile(this.getContext(),
-                new String[] { imageFile.getPath() }, new String[] { "video/mp4" },
+                new String[]{imageFile.getParent()}, null,
                 new MediaScannerConnection.OnScanCompletedListener() {
                     public void onScanCompleted(String path, Uri uri) {
                         Log.i("ExternalStorage", "Scanned file" + path + ":");
@@ -380,6 +339,12 @@ public class MediaPlugin extends Plugin {
 
     private class DownloadMedia extends AsyncTask<String, File, AsyncTaskResult<File>> {
 
+        private WeakReference<Context> contextRef;
+
+        public DownloadMedia(Context context) {
+            contextRef = new WeakReference<>(context);
+        }
+
         @Override
         protected AsyncTaskResult doInBackground(String... strings) {
             Log.d(MediaPlugin.tag, "Starting download of media: " + strings[0]);
@@ -397,11 +362,35 @@ public class MediaPlugin extends Plugin {
 
                 InputStream inputStream = new BufferedInputStream(connection.getInputStream());
 
-                // generate image file name using current date and time
+                OutputStream outputStream;
+                ContentResolver resolver;
+                Uri videoUri;
+                File videoFile;
                 String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssSSS").format(new Date());
-                File newFile = new File(strings[1], "VID_" + timeStamp + strings[2]);
+                String name = "VID_" + timeStamp + strings[2];
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    Context context = contextRef.get();
+                    resolver = context.getContentResolver();
+                    ContentValues contentValues = new ContentValues();
+                    contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+                    contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4");
+                    contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/" + strings[1]);
+                    videoUri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, contentValues);
+                    outputStream = resolver.openOutputStream(Objects.requireNonNull(videoUri));
+                    videoFile = new File(videoUri.toString());
 
-                OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(newFile));
+                } else {
+                    String moviesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES + "/" + strings[1]).toString();
+                    File albumDir = new File(moviesDir);
+                    // if destination folder does not exist, create it
+                    if (!albumDir.exists()) {
+                        if (!albumDir.mkdir()) {
+                            throw new RuntimeException("Destination folder does not exist and cannot be created.");
+                        }
+                    }
+                    videoFile = new File(moviesDir, name);
+                    outputStream = new BufferedOutputStream(new FileOutputStream(videoFile));
+                }
 
                 ret.put("started", true);
                 notifyListeners("status", ret);
@@ -418,12 +407,19 @@ public class MediaPlugin extends Plugin {
                 ret.put("finished", false);
                 notifyListeners("progress", ret);
                 while ((read = inputStream.read(buffer)) != -1) {
-                    if(isCancelled()) {
+                    if (isCancelled()) {
                         inputStream.close();
                         outputStream.flush();
                         outputStream.close();
-                        newFile.delete();
-                        return new AsyncTaskResult<>(newFile);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            Context context = contextRef.get();
+                            resolver = context.getContentResolver();
+                            resolver.delete(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.DISPLAY_NAME + "=?", new String[]{name});
+                        } else {
+                            videoFile.delete();
+                        }
+                        Log.i("CancelDownload", videoFile.getAbsolutePath());
+                        return new AsyncTaskResult<>(videoFile);
                     }
                     total += read;
                     if (fileLength > 0) {
@@ -443,7 +439,7 @@ public class MediaPlugin extends Plugin {
                 inputStream.close();
                 ret.put("finished", true);
                 notifyListeners("progress", ret);
-                return new AsyncTaskResult<>(newFile);
+                return new AsyncTaskResult<>(videoFile);
             } catch (MalformedURLException e) {
                 return new AsyncTaskResult<>(new RuntimeException("Bad url"));
             } catch (IOException e) {
