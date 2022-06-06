@@ -1,0 +1,31 @@
+{
+  "api": {
+    "name": "CapacitorVideoDownloadPlugin",
+    "slug": "capacitorvideodownloadplugin",
+    "docs": "",
+    "tags": [],
+    "methods": [
+      {
+        "name": "saveVideo",
+        "signature": "(options: { path: string; album: string; extension: string; }) => Promise<{ value: string; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "",
+            "type": "{ path: string; album: string; extension: string; }"
+          }
+        ],
+        "returns": "Promise<{ value: string; }>",
+        "tags": [],
+        "docs": "",
+        "complexTypes": [],
+        "slug": "savevideo"
+      }
+    ],
+    "properties": []
+  },
+  "interfaces": [],
+  "enums": [],
+  "typeAliases": [],
+  "pluginConfigs": []
+}
