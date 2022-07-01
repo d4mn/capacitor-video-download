@@ -53,7 +53,7 @@ import java.util.Objects;
 )
 public class CapacitorVideoDownloadPlugin extends Plugin {
 
-    public static String tag = "Capacitor/MediaPlugin";
+    public static String tag = "Capacitor/VideoDownloadPlugin";
 
     public static final int REQUEST_WRITE = 1986;
     AsyncTask<?, ?, ?> downloadTask;
@@ -288,7 +288,13 @@ public class CapacitorVideoDownloadPlugin extends Plugin {
                     Log.d(CapacitorVideoDownloadPlugin.tag, "Server returned HTTP " + connection.getResponseCode() + " " + connection.getResponseMessage());
                     return new AsyncTaskResult(new RuntimeException("File not found."));
                 }
-                int fileLength = connection.getContentLength();
+                long fileLength = 0;
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    fileLength = connection.getContentLengthLong();
+                } else {
+                    fileLength = connection.getContentLength();
+                }
+                Log.d(CapacitorVideoDownloadPlugin.tag, "File length: "+fileLength);
 
                 InputStream inputStream = new BufferedInputStream(connection.getInputStream());
 
