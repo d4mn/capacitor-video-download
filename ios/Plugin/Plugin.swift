@@ -13,8 +13,8 @@ public class JSDate {
  * Please read the Capacitor iOS Plugin Development Guide
  * here: https://capacitor.ionicframework.com/docs/plugins/ios
  */
-@objc(MediaPlugin)
-public class MediaPlugin: CAPPlugin {
+@objc(CapacitorVideoDownload)
+public class CapacitorVideoDownload: CAPPlugin {
     typealias JSObject = [String:Any]
     static let DEFAULT_QUANTITY = 25
     static let DEFAULT_TYPES = "photos"
@@ -211,7 +211,7 @@ public class MediaPlugin: CAPPlugin {
         
         let albumId = call.getString("albumIdentifier")
         
-        let quantity = call.getInt("quantity", MediaPlugin.DEFAULT_QUANTITY)
+        let quantity = call.getInt("quantity", CapacitorVideoDownload.DEFAULT_QUANTITY)
         
         var targetCollection: PHAssetCollection?
         
@@ -235,9 +235,9 @@ public class MediaPlugin: CAPPlugin {
         
         //let after = call.getString("after")
         
-        let types = call.getString("types") ?? MediaPlugin.DEFAULT_TYPES
-        let thumbnailWidth = call.getInt("thumbnailWidth", MediaPlugin.DEFAULT_THUMBNAIL_WIDTH)
-        let thumbnailHeight = call.getInt("thumbnailHeight", MediaPlugin.DEFAULT_THUMBNAIL_HEIGHT)
+        let types = call.getString("types") ?? CapacitorVideoDownload.DEFAULT_TYPES
+        let thumbnailWidth = call.getInt("thumbnailWidth", CapacitorVideoDownload.DEFAULT_THUMBNAIL_WIDTH)
+        let thumbnailHeight = call.getInt("thumbnailHeight", CapacitorVideoDownload.DEFAULT_THUMBNAIL_HEIGHT)
         let thumbnailSize = CGSize(width: thumbnailWidth, height: thumbnailHeight)
         let thumbnailQuality = call.getInt("thumbnailQuality", 95)
         
@@ -302,7 +302,7 @@ public class MediaPlugin: CAPPlugin {
     }
 }
 
-extension MediaPlugin: DownloadManagerDelegate {
+extension CapacitorVideoDownload: DownloadManagerDelegate {
     
     func didDownloadFileTo(location: URL) {
         print("Download finished for url \(location)")
