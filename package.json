@@ -1,6 +1,6 @@
 {
   "name": "capacitor-video-download",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Download video from web to phone",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",

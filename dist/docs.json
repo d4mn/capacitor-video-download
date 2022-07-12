@@ -20,6 +20,16 @@
         "docs": "",
         "complexTypes": [],
         "slug": "savevideo"
+      },
+      {
+        "name": "cancel",
+        "signature": "() => Promise<{ value: string; }>",
+        "parameters": [],
+        "returns": "Promise<{ value: string; }>",
+        "tags": [],
+        "docs": "",
+        "complexTypes": [],
+        "slug": "cancel"
       }
     ],
     "properties": []

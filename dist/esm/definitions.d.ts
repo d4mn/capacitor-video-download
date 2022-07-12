@@ -6,4 +6,7 @@ export interface CapacitorVideoDownloadPlugin {
     }): Promise<{
         value: string;
     }>;
+    cancel(): Promise<{
+        value: string;
+    }>;
 }

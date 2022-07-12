@@ -8,6 +8,9 @@ export declare class CapacitorVideoDownloadWeb extends WebPlugin implements Capa
     }): Promise<{
         value: string;
     }>;
+    cancel(): Promise<{
+        value: string;
+    }>;
     echo(options: {
         value: string;
     }): Promise<{

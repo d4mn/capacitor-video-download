@@ -14,6 +14,7 @@ npx cap sync
 <docgen-index>
 
 * [`saveVideo(...)`](#savevideo)
+* [`cancel()`](#cancel)
 
 </docgen-index>
 
@@ -29,6 +30,17 @@ saveVideo(options: { path: string; album: string; extension: string; }) => Promi
 | Param         | Type                                                             |
 | ------------- | ---------------------------------------------------------------- |
 | **`options`** | <code>{ path: string; album: string; extension: string; }</code> |
+
+**Returns:** <code>Promise&lt;{ value: string; }&gt;</code>
+
+--------------------
+
+
+### cancel()
+
+```typescript
+cancel() => Promise<{ value: string; }>
+```
 
 **Returns:** <code>Promise&lt;{ value: string; }&gt;</code>
 

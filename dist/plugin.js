@@ -7,7 +7,12 @@ var capacitorCapacitorVideoDownload = (function (exports, core) {
 
     class CapacitorVideoDownloadWeb extends core.WebPlugin {
         async saveVideo(options) {
-            console.log('saveVideo', options);
+            if (options.path) {
+                return { value: "ok" };
+            }
+            return { value: "ok" };
+        }
+        async cancel() {
             return { value: "ok" };
         }
         async echo(options) {
