@@ -7,7 +7,6 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
-
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -16,23 +15,16 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @CapacitorPlugin(
-        name = "CapacitorVideoDownload",
-        permissions = {
-                @Permission(
-                        alias = "storage",
-                        strings = {
-                                Manifest.permission.READ_EXTERNAL_STORAGE,
-                                Manifest.permission.WRITE_EXTERNAL_STORAGE
-                        }
-                )
-        }
+    name = "CapacitorVideoDownload",
+    permissions = {
+        @Permission(alias = "storage", strings = { Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE })
+    }
 )
 public class CapacitorVideoDownloadPlugin extends Plugin {
 
@@ -42,14 +34,14 @@ public class CapacitorVideoDownloadPlugin extends Plugin {
 
     private void beginDownload(PluginCall call, String url, String subPath, String fileName) {
         DownloadManager downloadManager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
-        Log.d(CapacitorVideoDownloadPlugin.tag, "beginDownload: " + url + " album: "+subPath + " filename: "+fileName);
+        Log.d(CapacitorVideoDownloadPlugin.tag, "beginDownload: " + url + " album: " + subPath + " filename: " + fileName);
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url))
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)// Visibility of the download Notification
-                .setDestinationInExternalPublicDir(Environment.DIRECTORY_MOVIES, subPath+"/"+fileName)
-                .setTitle(fileName)// Title of the Download Notification
-                .setDescription("Downloading recording")// Description of the Download Notification
-                .setAllowedOverMetered(true)// Set if download is allowed on Mobile network
-                .setAllowedOverRoaming(true);
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE) // Visibility of the download Notification
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_MOVIES, subPath + "/" + fileName)
+            .setTitle(fileName) // Title of the Download Notification
+            .setDescription("Downloading recording") // Description of the Download Notification
+            .setAllowedOverMetered(true) // Set if download is allowed on Mobile network
+            .setAllowedOverRoaming(true);
         request.allowScanningByMediaScanner();
         downloadId = downloadManager.enqueue(request);
 
@@ -57,93 +49,103 @@ public class CapacitorVideoDownloadPlugin extends Plugin {
         st.put("id", downloadId);
         st.put("started", true);
         notifyListeners("status", st);
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                boolean finishDownload = false;
-                int progress = 0;
+        executor.execute(
+            new Runnable() {
+                @Override
+                public void run() {
+                    boolean finishDownload = false;
+                    int progress = 0;
 
-                while (!finishDownload) {
-                    Cursor cursor = downloadManager.query(new DownloadManager.Query().setFilterById(downloadId));
-                    if (cursor.moveToFirst()) {
-                        int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
-                        switch (status) {
-                            case DownloadManager.STATUS_FAILED: {
-                                finishDownload = true;
-                                int reason = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_REASON));
-                                String failedReason = "";
-                                switch(reason){
-                                    case DownloadManager.ERROR_CANNOT_RESUME:
-                                        failedReason = "ERROR_CANNOT_RESUME";
+                    while (!finishDownload) {
+                        Cursor cursor = downloadManager.query(new DownloadManager.Query().setFilterById(downloadId));
+                        if (cursor.moveToFirst()) {
+                            int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                            switch (status) {
+                                case DownloadManager.STATUS_FAILED:
+                                    {
+                                        finishDownload = true;
+                                        int reason = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_REASON));
+                                        String failedReason = "";
+                                        switch (reason) {
+                                            case DownloadManager.ERROR_CANNOT_RESUME:
+                                                failedReason = "ERROR_CANNOT_RESUME";
+                                                break;
+                                            case DownloadManager.ERROR_DEVICE_NOT_FOUND:
+                                                failedReason = "ERROR_DEVICE_NOT_FOUND";
+                                                break;
+                                            case DownloadManager.ERROR_FILE_ALREADY_EXISTS:
+                                                failedReason = "ERROR_FILE_ALREADY_EXISTS";
+                                                break;
+                                            case DownloadManager.ERROR_FILE_ERROR:
+                                                failedReason = "ERROR_FILE_ERROR";
+                                                break;
+                                            case DownloadManager.ERROR_HTTP_DATA_ERROR:
+                                                failedReason = "ERROR_HTTP_DATA_ERROR";
+                                                break;
+                                            case DownloadManager.ERROR_INSUFFICIENT_SPACE:
+                                                failedReason = "ERROR_INSUFFICIENT_SPACE";
+                                                break;
+                                            case DownloadManager.ERROR_TOO_MANY_REDIRECTS:
+                                                failedReason = "ERROR_TOO_MANY_REDIRECTS";
+                                                break;
+                                            case DownloadManager.ERROR_UNHANDLED_HTTP_CODE:
+                                                failedReason = "ERROR_UNHANDLED_HTTP_CODE";
+                                                break;
+                                            case DownloadManager.ERROR_UNKNOWN:
+                                                failedReason = "ERROR_UNKNOWN";
+                                                break;
+                                        }
+                                        JSObject ret = new JSObject();
+                                        ret.put("canceled", true);
+                                        ret.put("reason", failedReason);
+                                        notifyListeners("status", ret, true);
                                         break;
-                                    case DownloadManager.ERROR_DEVICE_NOT_FOUND:
-                                        failedReason = "ERROR_DEVICE_NOT_FOUND";
+                                    }
+                                case DownloadManager.STATUS_PAUSED:
+                                case DownloadManager.STATUS_PENDING:
+                                    break;
+                                case DownloadManager.STATUS_RUNNING:
+                                    {
+                                        final long total = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                                        if (total > 0) {
+                                            final long downloaded = cursor.getLong(
+                                                cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                                            );
+                                            int _progress = (int) ((downloaded * 100L) / total);
+                                            if (_progress > progress) {
+                                                progress = _progress;
+                                                JSObject ret = new JSObject();
+                                                ret.put("id", downloadId);
+                                                ret.put("progress", progress);
+                                                ret.put("size", total);
+                                                ret.put("total", downloaded);
+                                                notifyListeners("progress", ret);
+                                            }
+                                        }
+
                                         break;
-                                    case DownloadManager.ERROR_FILE_ALREADY_EXISTS:
-                                        failedReason = "ERROR_FILE_ALREADY_EXISTS";
+                                    }
+                                case DownloadManager.STATUS_SUCCESSFUL:
+                                    {
+                                        progress = 100;
+                                        JSObject ret = new JSObject();
+                                        ret.put("status", 1);
+                                        call.resolve(ret);
+                                        finishDownload = true;
                                         break;
-                                    case DownloadManager.ERROR_FILE_ERROR:
-                                        failedReason = "ERROR_FILE_ERROR";
-                                        break;
-                                    case DownloadManager.ERROR_HTTP_DATA_ERROR:
-                                        failedReason = "ERROR_HTTP_DATA_ERROR";
-                                        break;
-                                    case DownloadManager.ERROR_INSUFFICIENT_SPACE:
-                                        failedReason = "ERROR_INSUFFICIENT_SPACE";
-                                        break;
-                                    case DownloadManager.ERROR_TOO_MANY_REDIRECTS:
-                                        failedReason = "ERROR_TOO_MANY_REDIRECTS";
-                                        break;
-                                    case DownloadManager.ERROR_UNHANDLED_HTTP_CODE:
-                                        failedReason = "ERROR_UNHANDLED_HTTP_CODE";
-                                        break;
-                                    case DownloadManager.ERROR_UNKNOWN:
-                                        failedReason = "ERROR_UNKNOWN";
-                                        break;
-                                }
-                                JSObject ret = new JSObject();
-                                ret.put("canceled",true);
-                                ret.put("reason", failedReason);
-                                notifyListeners("status", ret, true);
-                                break;
+                                    }
                             }
-                            case DownloadManager.STATUS_PAUSED:
-                            case DownloadManager.STATUS_PENDING:
-                                break;
-                            case DownloadManager.STATUS_RUNNING: {
-                                final long total = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
-                                final long downloaded = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
-                                int _progress = (int) ((downloaded * 100L) / total);
-                                if (total >= 0 && _progress > progress) {
-                                    progress = _progress;
-                                    JSObject ret = new JSObject();
-                                    ret.put("id", downloadId);
-                                    ret.put("progress", progress);
-                                    ret.put("size", total);
-                                    ret.put("total", downloaded);
-                                    notifyListeners("progress", ret);
-                                }
-                                break;
-                            }
-                            case DownloadManager.STATUS_SUCCESSFUL: {
-                                progress = 100;
-                                JSObject ret = new JSObject();
-                                ret.put("status", 1);
-                                call.resolve(ret);
-                                finishDownload = true;
-                                break;
-                            }
+                        } else {
+                            finishDownload = true;
+                            JSObject ret = new JSObject();
+                            ret.put("status", 1);
+                            call.reject("Download canceled");
                         }
-                    } else {
-                        finishDownload = true;
-                        JSObject ret = new JSObject();
-                        ret.put("status", 1);
-                        call.reject("Download canceled");
+                        cursor.close();
                     }
-                    cursor.close();
                 }
             }
-        });
+        );
     }
 
     @PermissionCallback
@@ -156,7 +158,7 @@ public class CapacitorVideoDownloadPlugin extends Plugin {
         }
     }
 
-    @PluginMethod()
+    @PluginMethod
     public void saveVideo(final PluginCall call) {
         Log.d(getLogTag(), "SAVE VIDEO to album");
 
@@ -168,9 +170,9 @@ public class CapacitorVideoDownloadPlugin extends Plugin {
         }
     }
 
-    @PluginMethod()
+    @PluginMethod
     public void cancel(PluginCall call) {
-        Log.d(CapacitorVideoDownloadPlugin.tag,"Cancel download: "+downloadId);
+        Log.d(CapacitorVideoDownloadPlugin.tag, "Cancel download: " + downloadId);
         DownloadManager downloadManager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
         downloadManager.remove(downloadId);
         call.resolve();
